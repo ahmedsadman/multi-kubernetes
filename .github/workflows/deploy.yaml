@@ -1,0 +1,54 @@
+name: Deploy Multi K8s
+on:
+  push:
+    branches:
+      - master
+
+env:
+  SHA: $(git rev-parse HEAD)
+
+jobs:
+  build:
+    name: Build, push and deploy
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Test
+      run: |-
+          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+          docker build -t ahmedsadman/react-test -f ./client/Dockerfile.dev ./client
+          docker run -e CI=true ahmedsadman/react-test npm test
+
+    - name: Build images
+      run: |-
+          docker build -t ahmedsadman/multi-client:latest -t ahmedsadman/multi-client:${{ env.SHA }} -f ./client/Dockerfile ./client
+          docker build -t ahmedsadman/multi-server:latest -t ahmedsadman/multi-server:${{ env.SHA }} -f ./server/Dockerfile ./server
+          docker build -t ahmedsadman/multi-worker:latest -t ahmedsadman/multi-worker:${{ env.SHA }} -f ./worker/Dockerfile ./worker
+
+    - name: Push images
+      run: |-
+          docker push ahmedsadman/multi-client:latest
+          docker push ahmedsadman/multi-server:latest
+          docker push ahmedsadman/multi-worker:latest
+
+          docker push ahmedsadman/multi-client:${{ env.SHA }}
+          docker push ahmedsadman/multi-server:${{ env.SHA }}
+          docker push ahmedsadman/multi-worker:${{ env.SHA }}
+    
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+    - name: Save DigitalOcean kubeconfig with short lived credentials
+      run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 54570b69-2087-403c-a7bd-e96b461bbfed
+
+    - name: Apply
+      run: |-
+        kubectl apply -f k8s
+        kubectl set image deployments/server-deployment server=ahmedsadman/multi-server:${{ env.SHA }}
+        kubectl set image deployments/client-deployment client=ahmedsadman/multi-client:${{ env.SHA }}
+        kubectl set image deployments/worker-deployment worker=ahmedsadman/multi-worker:${{ env.SHA }}
