@@ -4,6 +4,19 @@ An intentionally complex fibonacci calculator requiring multiple services, deplo
 
 ## Configuring DigitalOcean
 
+### Cluster init script
+You can use the `init-doks.sh` file to initialize your DOKS (DigitalOcean Kubernetes) cluster and deploy the application. You need to
+run the series of following commands when cluster provisioning is complete
+
+```
+chmod +x init-doks.sh # give execute permission
+doctl auth init # authorize DO access with access token
+./init-doks.sh <doks_cluster_id>
+```
+
+The script will setup everything. Please note, a CI/CD pipeline is also created with Github Actions. But to make the CI/CD
+pipeline work properly, either you have to run this `init-doks.sh` file or configure the cluster manually (first-time only).
+
 ### Switching Kubernetes Context
 We can easily switch config context and directly interact with the DO cluster using `kubectl` commands. [Follow this guide](https://docs.digitalocean.com/products/kubernetes/how-to/connect-to-cluster)
 
